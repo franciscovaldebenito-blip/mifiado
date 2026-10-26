@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#155e52">
+  <meta name="description" content="MiFiado: administra el fiado de tu negocio y consulta tu saldo familiar.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/styles.css">
+  <title>MiFiado</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="MiFiado, inicio"><span class="brand-mark">M</span><span>MiFiado</span></a>
+    <div class="top-actions"><button id="install-button" class="button button-light" hidden>Instalar app</button><button id="signout-button" class="button button-quiet" hidden>Cerrar sesión</button></div>
+  </header>
+  <main class="shell">
+    <section id="auth-view" class="auth-layout">
+      <div class="hero">
+        <p class="eyebrow">El fiado, claro para todos</p>
+        <h1>Tu almacén y tus cuentas, en orden.</h1>
+        <p>Registra compras y abonos, comparte una cuenta familiar y revisa el saldo desde el celular.</p>
+        <div class="hero-points"><span>✓ Para negocios de barrio</span><span>✓ Cuentas individuales y familiares</span><span>✓ Instalable en el teléfono</span></div>
+      </div>
+      <div class="card auth-card">
+        <div class="tabs" role="tablist"><button type="button" class="tab active" data-auth-tab="login">Ingresar</button><button type="button" class="tab" data-auth-tab="signup">Crear cuenta</button></div>
+        <form id="auth-form" class="form">
+          <label id="name-field" class="field" hidden>Tu nombre<input name="name" autocomplete="name" maxlength="100"></label>
+          <label class="field">Correo electrónico<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
+          <label class="field">Contraseña<input name="password" type="password" autocomplete="current-password" required minlength="8"></label>
+          <button id="auth-submit" class="button button-primary" type="submit">Ingresar</button>
+          <p id="auth-message" class="message" aria-live="polite"></p>
+        </form>
+        <p class="small-note">Al registrarte, aceptas usar MiFiado conforme a sus condiciones de servicio.</p>
+      </div>
+    </section>
+    <section id="app-view" hidden>
+      <div class="welcome-row"><div><p class="eyebrow">Tu espacio MiFiado</p><h1 id="welcome-title">Hola</h1><p class="muted">Elige el panel que quieras abrir.</p></div><span id="connection-state" class="status-pill">Conectando…</span></div>
+      <div id="role-notice" class="notice" hidden></div>
+      <div class="panel-grid">
+        <article id="platform-card" class="card panel-card" hidden><div class="panel-icon">✦</div><p class="eyebrow">Panel 01</p><h2>Administración MiFiado</h2><p>Gestiona negocios, planes y estado de las suscripciones.</p><button class="button button-primary" data-open-panel="platform">Abrir panel</button></article>
+        <article id="store-card" class="card panel-card" hidden><div class="panel-icon">⌂</div><p class="eyebrow">Panel 02</p><h2>Mi almacén</h2><p>Administra cuentas, registra fiados y anota abonos.</p><button class="button button-primary" data-open-panel="store">Abrir panel</button></article>
+        <article id="customer-card" class="card panel-card" hidden><div class="panel-icon">♡</div><p class="eyebrow">Panel 03</p><h2>Mi cuenta</h2><p>Consulta tu saldo y los movimientos de tu cuenta familiar.</p><button class="button button-primary" data-open-panel="customer">Abrir panel</button></article>
+      </div>
+      <section id="business-setup" class="card setup-card" hidden><div><p class="eyebrow">Primer paso</p><h2>Registra tu negocio</h2><p class="muted">Al crear el negocio, tu cuenta quedará como dueña.</p></div><form id="business-form" class="form inline-form"><label class="field">Nombre del negocio<input name="name" required maxlength="120" placeholder="Ej. Almacén Don Pedro"></label><label class="field">RUT (opcional)<input name="rut" maxlength="20" placeholder="12.345.678-9"></label><button class="button button-primary" type="submit">Crear negocio</button><p id="business-message" class="message" aria-live="polite"></p></form></section>
+    </section>
+    <section id="panel-view" hidden>
+      <div class="panel-heading"><button id="back-button" class="button button-light">← Todos los paneles</button><div><p id="panel-eyebrow" class="eyebrow">Panel</p><h1 id="panel-title"></h1></div></div>
+      <div id="panel-content"></div>
+    </section>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
+  <footer class="footer"><span>MiFiado</span><span>Tu cuenta, tu negocio, con claridad.</span></footer>
+  <script src="/config.js"></script>
+  <script src="/js/app.bundle.js?v=qr-approval-v1" defer></script>
+</body>
+</html>
