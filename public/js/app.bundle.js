@@ -52541,6 +52541,26 @@ ${suffix}`;
   function accountOptions(rows) {
     return rows.map((a) => '<option value="' + a.id + '">' + esc(a.nombre) + " \xB7 " + esc(a.tipo) + "</option>").join("");
   }
+  function mountPanelTabs(root) {
+    root.querySelectorAll("[data-tab-target]").forEach((button) => button.addEventListener("click", () => {
+      root.querySelectorAll("[data-tab-target]").forEach((b) => {
+        const active = b === button;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-selected", String(active));
+      });
+      root.querySelectorAll("[data-tab-panel]").forEach((panel) => {
+        panel.hidden = panel.id !== button.dataset.tabTarget;
+      });
+    }));
+  }
+  function dateKey(value) {
+    const d = new Date(value);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function inDateRange(value, from, to) {
+    const key = dateKey(value);
+    return (!from || key >= from) && (!to || key <= to);
+  }
   async function renderStore(root) {
     if (pendingChargePoll) {
       clearInterval(pendingChargePoll);
@@ -52549,32 +52569,69 @@ ${suffix}`;
     const allowed = businesses.filter((b) => memberships.some((m) => m.negocio_id === b.id && ["dueno", "personal"].includes(m.rol)));
     const storeAccounts = accounts.filter((a) => businesses.some((b) => b.id === a.negocio_id));
     const accountOpts = accountOptions(storeAccounts);
-    root.innerHTML = '<div class="summary-grid"><article class="card metric"><span>Negocios</span><strong>' + businesses.length + '</strong></article><article class="card metric"><span>Cuentas visibles</span><strong>' + storeAccounts.length + '</strong></article></div><div class="store-layout"><section class="card section-card"><div class="section-title"><div><p class="eyebrow">Cuentas</p><h2>Clientes y familias</h2></div></div><div class="data-list">' + (storeAccounts.map(accountRow).join("") || '<p class="empty-state">Crea una cuenta para empezar.</p>') + '</div></section><section class="card section-card"><p class="eyebrow">Cobro con autorizaci\xF3n</p><h2>Preparar fiado</h2><p class="muted">Ingresa el monto. El cliente revisar\xE1 y aprobar\xE1 el cobro escaneando el QR.</p><form id="movement-form" class="form"><label class="field">Cuenta<select name="account" required>' + accountOpts + '</select></label><label class="field">Cliente que compra<select name="member" required><option value="">Selecciona un cliente vinculado</option></select></label><label class="field">Tipo<select name="type"><option value="fiado">Fiado (requiere QR)</option><option value="abono">Abono recibido</option></select></label><label class="field">Monto en pesos<input name="amount" type="number" min="1" step="1" required></label><label class="field">Detalle opcional<input name="description" maxlength="180" placeholder="Ej. compra semanal"></label><button class="button button-primary" ' + (storeAccounts.length ? "" : "disabled") + '>Generar QR de cobro</button><p id="movement-message" class="message" aria-live="polite"></p></form></section></div><section id="pending-qr-card" class="card section-card qr-charge-card" hidden><div class="qr-copy"><p class="eyebrow">Cobro pendiente de aprobaci\xF3n</p><h2 id="qr-charge-title">Escanea para autorizar</h2><p id="qr-charge-info" class="muted"></p><p id="qr-charge-status" class="status-pill">Esperando confirmaci\xF3n del cliente</p></div><canvas id="charge-qr" aria-label="QR temporal para aprobar el fiado"></canvas></section><section class="card section-card"><p class="eyebrow">Dar acceso a un cliente</p><h2>Vincular titular o integrante</h2><p class="muted">El cliente debe crear su cuenta en MiFiado y confirmar el correo antes de que puedas vincularlo.</p><form id="member-form" class="form inline-form"><label class="field">Cuenta<select name="account" required>' + accountOpts + '</select></label><label class="field">Correo con que se registr\xF3 el cliente<input name="email" type="email" required maxlength="254" placeholder="cliente@correo.cl"></label><label class="field">Nombre visible<input name="name" required maxlength="100" placeholder="Nombre del cliente"></label><label class="field">Permiso en la cuenta<select name="role"><option value="titular">Titular responsable</option><option value="integrante">Integrante autorizado</option></select></label><label class="field">L\xEDmite individual opcional<input name="limit" type="number" min="0" step="1" placeholder="Dejar vac\xEDo para usar el l\xEDmite familiar"></label><button class="button button-primary" ' + (storeAccounts.length ? "" : "disabled") + '>Vincular cliente</button><p id="member-message" class="message" aria-live="polite"></p></form></section><section class="card section-card"><p class="eyebrow">Crear cuenta</p><h2>Cuenta individual o familiar</h2><form id="account-form" class="form inline-form"><label class="field">Almac\xE9n<select name="business" required>' + allowed.map((b) => '<option value="' + b.id + '">' + esc(b.nombre) + "</option>").join("") + '</select></label><label class="field">Nombre del cliente o familia<input name="name" required maxlength="120" placeholder="Ej. Familia Soto"></label><label class="field">Tipo<select name="type"><option value="individual">Individual</option><option value="familiar">Familiar</option></select></label><label class="field">L\xEDmite de cr\xE9dito<input name="limit" type="number" min="0" step="1" value="0" required></label><button class="button button-primary" ' + (allowed.length ? "" : "disabled") + '>Crear cuenta</button><p id="account-message" class="message" aria-live="polite"></p></form></section>';
-    const chargeForm = $("#movement-form"), accountSelect = chargeForm.elements.account, memberSelect = chargeForm.elements.member;
+    root.innerHTML = '<div class="summary-grid"><article class="card metric"><span>Negocios</span><strong>' + businesses.length + '</strong></article><article class="card metric"><span>Cuentas visibles</span><strong>' + storeAccounts.length + '</strong></article></div><nav class="panel-tabs" role="tablist" aria-label="Secciones del almacenero"><button class="panel-tab active" data-tab-target="store-charge-panel" role="tab" aria-selected="true">Cobrar</button><button class="panel-tab" data-tab-target="store-accounts-panel" role="tab" aria-selected="false">Cuentas y familias</button><button class="panel-tab" data-tab-target="store-history-panel" role="tab" aria-selected="false">Movimientos</button></nav><section id="store-charge-panel" data-tab-panel><div class="store-layout"><section class="card section-card"><p class="eyebrow">Cobro con autorizaci\xF3n</p><h2>Preparar fiado</h2><p class="muted">Agrega los productos; MiFiado sumar\xE1 el total. El cliente revisa y aprueba el cobro con QR.</p><form id="movement-form" class="form"><label class="field">Cuenta<select name="account" required>' + accountOpts + '</select></label><label class="field">Qui\xE9n compra<select name="member" required><option value="">Selecciona al integrante</option></select></label><label class="field">Tipo<select name="type"><option value="fiado">Fiado (requiere QR)</option><option value="abono">Abono recibido</option></select></label><div id="product-calculator" class="product-calculator"><p class="eyebrow">Calculadora de productos</p><div class="calculator-entry"><label class="field">Producto<input name="productName" maxlength="50" placeholder="Ej. Pan"></label><label class="field">Precio<input name="productAmount" type="number" min="1" step="1" placeholder="0"></label><button id="add-product" type="button" class="button button-light">Sumar</button></div><div id="product-lines" class="product-lines"><p class="empty-state">Agrega cada producto para calcular la compra.</p></div></div><label class="field">Monto total en pesos<input name="amount" type="number" min="1" step="1" required placeholder="Escribe el monto o usa la calculadora"></label><label class="field">Detalle adicional opcional<input name="description" maxlength="180" placeholder="Ej. compra semanal"></label><button class="button button-primary" ' + (storeAccounts.length ? "" : "disabled") + '>Generar QR de cobro</button><p id="movement-message" class="message" aria-live="polite"></p></form></section><section class="card section-card"><p class="eyebrow">Resumen r\xE1pido</p><h2>Saldos de clientes</h2><div class="data-list">' + (storeAccounts.map(accountRow).join("") || '<p class="empty-state">Crea una cuenta para empezar.</p>') + '</div></section></div><section id="pending-qr-card" class="card section-card qr-charge-card" hidden><div class="qr-copy"><p class="eyebrow">Cobro pendiente de aprobaci\xF3n</p><h2 id="qr-charge-title">Escanea para autorizar</h2><p id="qr-charge-info" class="muted"></p><p id="qr-charge-status" class="status-pill">Esperando confirmaci\xF3n del cliente</p></div><canvas id="charge-qr" aria-label="QR temporal para aprobar el fiado"></canvas></section></section><section id="store-accounts-panel" data-tab-panel hidden><section class="card section-card"><p class="eyebrow">Cuentas</p><h2>Clientes y familias</h2><div class="data-list">' + (storeAccounts.map(accountRow).join("") || '<p class="empty-state">Crea una cuenta para empezar.</p>') + '</div></section><div class="store-layout"><section class="card section-card"><p class="eyebrow">Agregar acceso</p><h2>Integrar a una persona</h2><p class="muted">La persona debe registrarse en MiFiado con su correo. Despu\xE9s la agregas aqu\xED a la cuenta familiar o individual.</p><form id="member-form" class="form"><label class="field">Cuenta<select name="account" required>' + accountOpts + '</select></label><label class="field">Correo del integrante<input name="email" type="email" required maxlength="254" placeholder="persona@correo.cl"></label><label class="field">Nombre visible<input name="name" required maxlength="100" placeholder="Ej. Sof\xEDa"></label><label class="field">Permiso en la cuenta<select name="role"><option value="titular">Titular responsable</option><option value="integrante">Integrante autorizado</option></select></label><label class="field">L\xEDmite individual opcional<input name="limit" type="number" min="0" step="1" placeholder="Usar l\xEDmite familiar"></label><button class="button button-primary" ' + (storeAccounts.length ? "" : "disabled") + '>Vincular integrante</button><p id="member-message" class="message" aria-live="polite"></p></form></section><section class="card section-card"><p class="eyebrow">Crear cuenta</p><h2>Cuenta individual o familiar</h2><form id="account-form" class="form"><label class="field">Almac\xE9n<select name="business" required>' + allowed.map((b) => '<option value="' + b.id + '">' + esc(b.nombre) + "</option>").join("") + '</select></label><label class="field">Nombre del cliente o familia<input name="name" required maxlength="120" placeholder="Ej. Familia Soto"></label><label class="field">Tipo<select name="type"><option value="individual">Individual</option><option value="familiar">Familiar</option></select></label><label class="field">L\xEDmite de cr\xE9dito<input name="limit" type="number" min="0" step="1" value="0" required></label><button class="button button-primary" ' + (allowed.length ? "" : "disabled") + '>Crear cuenta</button><p id="account-message" class="message" aria-live="polite"></p></form></section></div></section><section id="store-history-panel" data-tab-panel hidden><section class="card section-card"><p class="eyebrow">Historial</p><h2>Movimientos del almac\xE9n</h2><div class="history-filters"><label class="field">Cuenta<select id="store-history-account"><option value="">Todas las cuentas</option>' + storeAccounts.map((a) => '<option value="' + a.id + '">' + esc(a.nombre) + "</option>").join("") + '</select></label><label class="field">Integrante<select id="store-history-member"><option value="">Todos</option>' + storeMembers.filter((m) => m.estado === "activo").map((m) => '<option value="' + m.id + '">' + esc(m.nombre) + "</option>").join("") + '</select></label><label class="field">Desde<input id="store-history-from" type="date"></label><label class="field">Hasta<input id="store-history-to" type="date"></label></div><div id="store-history-list" class="history-list"></div></section></section>';
+    mountPanelTabs(root);
+    const chargeForm = $("#movement-form"), accountSelect = chargeForm.elements.account, memberSelect = chargeForm.elements.member, typeSelect = chargeForm.elements.type, chargeButton = chargeForm.querySelector('button[type="submit"]'), amountInput = chargeForm.elements.amount;
+    const productItems = [];
+    function drawProducts() {
+      const list = $("#product-lines");
+      list.innerHTML = productItems.length ? productItems.map((item, index) => '<div class="calculator-line"><span>' + esc(item.name) + "</span><strong>" + money(item.amount) + '</strong><button type="button" class="remove-product" data-index="' + index + '" aria-label="Quitar ' + esc(item.name) + '">Quitar</button></div>').join("") : '<p class="empty-state">Agrega cada producto para calcular la compra.</p>';
+      const total = productItems.reduce((sum, item) => sum + item.amount, 0);
+      if (total) amountInput.value = String(total);
+      else amountInput.value = "";
+    }
+    $("#add-product").addEventListener("click", () => {
+      const name = String(chargeForm.elements.productName.value).trim() || "Producto", amount = Number(chargeForm.elements.productAmount.value);
+      if (!Number.isSafeInteger(amount) || amount < 1) {
+        notify("Ingresa un precio v\xE1lido para el producto.", true);
+        return;
+      }
+      productItems.push({ name, amount });
+      chargeForm.elements.productName.value = "";
+      chargeForm.elements.productAmount.value = "";
+      drawProducts();
+      chargeForm.elements.productName.focus();
+    });
+    $("#product-lines").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-index]");
+      if (!button) return;
+      productItems.splice(Number(button.dataset.index), 1);
+      drawProducts();
+    });
     function refreshMembers() {
       const rows = membersForAccount(accountSelect.value);
-      memberSelect.innerHTML = '<option value="">Selecciona un cliente vinculado</option>' + rows.map((m) => '<option value="' + m.id + '">' + esc(m.nombre) + " \xB7 " + (m.rol_cuenta === "titular" ? "titular" : "integrante") + "</option>").join("");
+      memberSelect.innerHTML = '<option value="">Selecciona al integrante</option>' + rows.map((m) => '<option value="' + m.id + '">' + esc(m.nombre) + " \xB7 " + (m.rol_cuenta === "titular" ? "titular" : "integrante") + "</option>").join("");
       memberSelect.disabled = !rows.length;
     }
-    const typeSelect = chargeForm.elements.type, chargeButton = chargeForm.querySelector("button");
     accountSelect.addEventListener("change", refreshMembers);
     refreshMembers();
     typeSelect.addEventListener("change", () => {
-      chargeButton.textContent = typeSelect.value === "abono" ? "Registrar abono recibido" : "Generar QR de cobro";
+      const isCharge = typeSelect.value !== "abono";
+      $("#product-calculator").hidden = !isCharge;
+      chargeButton.textContent = isCharge ? "Generar QR de cobro" : "Registrar abono recibido";
+      if (!isCharge) {
+        productItems.length = 0;
+        drawProducts();
+      }
     });
     chargeForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const f = new FormData(e.currentTarget), account = accounts.find((a) => a.id === f.get("account")), member = storeMembers.find((m) => m.id === f.get("member"));
-      const button = e.currentTarget.querySelector("button");
+      const f = new FormData(e.currentTarget), account = accounts.find((a) => a.id === f.get("account")), member = storeMembers.find((m) => m.id === f.get("member")), button = e.currentTarget.querySelector('button[type="submit"]');
+      const amount = productItems.length ? productItems.reduce((sum, item) => sum + item.amount, 0) : Number(f.get("amount"));
+      const productsText = productItems.map((item) => item.name + " " + money(item.amount)).join(" + "), detail = String(f.get("description") || "").trim(), description = [productsText, detail].filter(Boolean).join(" \xB7 ").slice(0, 180) || null;
       if (!account || !member) {
-        message("#movement-message", "Primero vincula al cliente a esta cuenta.", true);
+        message("#movement-message", "Selecciona la cuenta y qui\xE9n hizo la compra.", true);
+        return;
+      }
+      if (!Number.isSafeInteger(amount) || amount < 1) {
+        message("#movement-message", "Agrega productos o ingresa un monto v\xE1lido.", true);
         return;
       }
       button.disabled = true;
-      message("#movement-message", "Creando cobro pendiente\u2026");
+      message("#movement-message", typeSelect.value === "abono" ? "Registrando abono\u2026" : "Creando cobro pendiente\u2026");
       try {
         if (String(f.get("type")) === "abono") {
-          const { error: error2 } = await supabase.rpc("fia_registrar_movimiento", { p_negocio_id: account.negocio_id, p_cuenta_id: account.id, p_tipo: "abono", p_monto: Number(f.get("amount")), p_clave_idempotencia: crypto.randomUUID(), p_integrante_id: member.id, p_descripcion: String(f.get("description") || "").trim() || null });
+          const { error: error2 } = await supabase.rpc("fia_registrar_movimiento", { p_negocio_id: account.negocio_id, p_cuenta_id: account.id, p_tipo: "abono", p_monto: amount, p_clave_idempotencia: crypto.randomUUID(), p_integrante_id: member.id, p_descripcion: description });
           if (error2) throw error2;
           notify("Abono registrado.");
           await loadIdentity(currentUser);
@@ -52582,14 +52639,14 @@ ${suffix}`;
           return;
         }
         const token = randomQrToken(), tokenHash = await hashQrToken(token);
-        const { data, error } = await supabase.rpc("fia_crear_fiado_pendiente", { p_negocio_id: account.negocio_id, p_cuenta_id: account.id, p_integrante_id: member.id, p_monto: Number(f.get("amount")), p_descripcion: String(f.get("description") || "").trim() || null, p_token_hash: tokenHash });
+        const { data, error } = await supabase.rpc("fia_crear_fiado_pendiente", { p_negocio_id: account.negocio_id, p_cuenta_id: account.id, p_integrante_id: member.id, p_monto: amount, p_descripcion: description, p_token_hash: tokenHash });
         if (error) throw error;
         await import_qrcode.default.toCanvas($("#charge-qr"), "MIFIADO:COBRO:" + token, { width: 260, margin: 2, color: { dark: "#123c34", light: "#ffffff" } });
-        $("#qr-charge-info").textContent = member.nombre + " \xB7 " + account.nombre + " \xB7 " + money(f.get("amount")) + " \xB7 vence " + new Date(data.expira_en).toLocaleTimeString("es-CL");
+        $("#qr-charge-info").textContent = member.nombre + " \xB7 " + account.nombre + " \xB7 " + money(amount) + " \xB7 vence " + new Date(data.expira_en).toLocaleTimeString("es-CL");
         $("#qr-charge-status").textContent = "Esperando confirmaci\xF3n del cliente";
         $("#qr-charge-status").className = "status-pill";
         $("#pending-qr-card").hidden = false;
-        message("#movement-message", "Muestra el QR al cliente para que lo escanee desde su panel Mi cuenta.");
+        message("#movement-message", "Muestra el QR al cliente para que revise y apruebe el total.");
         if (pendingChargePoll) clearInterval(pendingChargePoll);
         pendingChargePoll = setInterval(async () => {
           const { data: statusData, error: statusError } = await supabase.from("fia_fiados_pendientes").select("estado,expira_en").eq("id", data.id).maybeSingle();
@@ -52625,11 +52682,11 @@ ${suffix}`;
       const f = new FormData(e.currentTarget), a = accounts.find((x) => x.id === f.get("account")), btn = e.currentTarget.querySelector("button");
       if (!a) return;
       btn.disabled = true;
-      message("#member-message", "Vinculando cliente\u2026");
+      message("#member-message", "Vinculando integrante\u2026");
       try {
         const { error } = await supabase.rpc("fia_agregar_integrante_por_correo", { p_negocio_id: a.negocio_id, p_cuenta_id: a.id, p_email: String(f.get("email")).trim().toLowerCase(), p_nombre: String(f.get("name")).trim(), p_rol_cuenta: String(f.get("role")), p_limite_individual: f.get("limit") ? Number(f.get("limit")) : null });
         if (error) throw error;
-        notify("Cliente vinculado a la cuenta.");
+        notify("Integrante vinculado a la cuenta.");
         await loadIdentity(currentUser);
         await openPanel("store");
       } catch (err) {
@@ -52655,6 +52712,16 @@ ${suffix}`;
         btn.disabled = false;
       }
     });
+    function renderStoreHistory() {
+      const accountId = $("#store-history-account").value, memberId = $("#store-history-member").value, from = $("#store-history-from").value, to = $("#store-history-to").value;
+      const rows = movements.filter((m) => storeAccounts.some((a) => a.id === m.cuenta_id) && (!accountId || m.cuenta_id === accountId) && (!memberId || m.integrante_id === memberId) && inDateRange(m.creado_en, from, to));
+      $("#store-history-list").innerHTML = rows.length ? rows.map((m) => {
+        const account = storeAccounts.find((a) => a.id === m.cuenta_id), member = storeMembers.find((x) => x.id === m.integrante_id), debit = ["fiado", "ajuste_cargo"].includes(m.tipo);
+        return '<article class="history-row"><div><strong>' + esc(m.tipo.replace("_", " ")) + " \xB7 " + esc(member ? member.nombre : "Sin integrante") + "</strong><small>" + esc(account ? account.nombre : "Cuenta") + " \xB7 " + new Date(m.creado_en).toLocaleString("es-CL") + (m.descripcion ? " \xB7 " + esc(m.descripcion) : "") + '</small></div><strong class="' + (debit ? "debit" : "credit") + '">' + (debit ? "+" : "\u2212") + money(m.monto) + "</strong></article>";
+      }).join("") : '<p class="empty-state">No hay movimientos para esos filtros.</p>';
+    }
+    ["store-history-account", "store-history-member", "store-history-from", "store-history-to"].forEach((id) => $("#" + id).addEventListener("change", renderStoreHistory));
+    renderStoreHistory();
   }
   async function renderCustomer(root) {
     if (customerScanner) {
@@ -52664,16 +52731,40 @@ ${suffix}`;
       }
       customerScanner = null;
     }
-    root.innerHTML = '<section class="card section-card"><p class="eyebrow">Aprobaci\xF3n segura</p><h2>Escanear QR de fiado</h2><p class="muted">Revisa el negocio y el monto antes de confirmar. El saldo solo cambia despu\xE9s de tu aprobaci\xF3n.</p><button id="start-qr-scan" type="button" class="button button-primary">Abrir c\xE1mara y escanear</button><div id="qr-reader" class="qr-reader"></div><p id="scan-message" class="message" aria-live="polite"></p><div id="customer-charge-result" class="customer-charge-result" hidden></div></section><section class="card section-card"><p class="eyebrow">Vista del cliente</p><h2>Mis cuentas</h2><div id="customer-data" class="data-list">Cargando saldo e historial\u2026</div></section>';
     const ids = Array.from(new Set(customerRows.map((r) => r.cuenta_id))), linked = accounts.filter((a) => ids.includes(a.id));
-    if (!linked.length) $("#customer-data").innerHTML = '<p class="empty-state">No hay cuentas vinculadas todav\xEDa. Pide al almac\xE9n que te agregue como titular o integrante.</p>';
-    else $("#customer-data").innerHTML = linked.map((a) => {
-      const rows = movements.filter((m) => m.cuenta_id === a.id), total = balance(a.id);
-      return '<article class="customer-account"><div class="customer-account-head"><div><span class="eyebrow">' + esc(a.tipo) + "</span><h3>" + esc(a.nombre) + '</h3></div><div class="balance"><span>Saldo</span><strong>' + money(total) + '</strong></div></div><div class="movement-list">' + (rows.length ? rows.map((m) => {
-        const debit = ["fiado", "ajuste_cargo"].includes(m.tipo);
-        return '<div class="movement-row"><span><strong>' + esc(m.tipo.replace("_", " ")) + "</strong><small>" + new Date(m.creado_en).toLocaleString("es-CL") + (m.descripcion ? " \xB7 " + esc(m.descripcion) : "") + '</small></span><strong class="' + (debit ? "debit" : "credit") + '">' + (debit ? "+" : "\u2212") + money(m.monto) + "</strong></div>";
-      }).join("") : '<p class="empty-state">A\xFAn no hay movimientos.</p>') + "</div></article>";
-    }).join("");
+    root.innerHTML = '<nav class="panel-tabs" role="tablist" aria-label="Secciones del cliente"><button class="panel-tab active" data-tab-target="customer-approve-panel" role="tab" aria-selected="true">Aprobar fiado</button><button class="panel-tab" data-tab-target="customer-history-panel" role="tab" aria-selected="false">Mi cuenta e historial</button></nav><section id="customer-approve-panel" data-tab-panel><section class="card section-card"><p class="eyebrow">Aprobaci\xF3n segura</p><h2>Escanear QR de fiado</h2><p class="muted">Revisa qui\xE9n hizo la compra y el monto antes de confirmar. El movimiento quedar\xE1 asociado al integrante que compra.</p><button id="start-qr-scan" type="button" class="button button-primary">Abrir c\xE1mara y escanear</button><div id="qr-reader" class="qr-reader"></div><p id="scan-message" class="message" aria-live="polite"></p><div id="customer-charge-result" class="customer-charge-result" hidden></div></section></section><section id="customer-history-panel" data-tab-panel hidden><section class="card section-card"><p class="eyebrow">Consulta familiar</p><h2>Mi cuenta e historial</h2><div class="history-filters"><label class="field">Cuenta<select id="customer-history-account"><option value="">Todas</option>' + linked.map((a) => '<option value="' + a.id + '">' + esc(a.nombre) + "</option>").join("") + '</select></label><label id="customer-member-filter-wrap" class="field">Integrante<select id="customer-history-member"><option value="">Todos los integrantes</option></select></label><label class="field">Desde<input id="customer-history-from" type="date"></label><label class="field">Hasta<input id="customer-history-to" type="date"></label></div><div id="customer-data" class="customer-data">Cargando saldo e historial\u2026</div></section></section>';
+    mountPanelTabs(root);
+    const membershipsByAccount = new Map(linked.map((a) => [a.id, customerRows.filter((r) => r.cuenta_id === a.id)]));
+    const visibleMemberChoices = [];
+    for (const a of linked) {
+      const mine = membershipsByAccount.get(a.id) || [], isHolder = mine.some((r) => r.rol_cuenta === "titular");
+      const choices = isHolder ? storeMembers.filter((m) => m.cuenta_id === a.id && m.estado === "activo" && m.usuario_id) : mine;
+      for (const m of choices) {
+        if (!visibleMemberChoices.some((x) => x.id === m.id)) visibleMemberChoices.push(m);
+      }
+    }
+    const holderHasFamilyAccess = linked.some((a) => (membershipsByAccount.get(a.id) || []).some((r) => r.rol_cuenta === "titular"));
+    $("#customer-member-filter-wrap").hidden = !holderHasFamilyAccess;
+    $("#customer-history-member").innerHTML = '<option value="">Todos los integrantes</option>' + visibleMemberChoices.map((m) => '<option value="' + m.cuenta_id + ":" + m.id + '">' + esc(accounts.find((a) => a.id === m.cuenta_id)?.nombre || "Cuenta") + " \xB7 " + esc(m.nombre) + "</option>").join("");
+    function renderCustomerHistory() {
+      const accountFilter = $("#customer-history-account").value, memberFilter = $("#customer-history-member").value, from = $("#customer-history-from").value, to = $("#customer-history-to").value;
+      const visibleAccounts = linked.filter((a) => !accountFilter || a.id === accountFilter);
+      if (!linked.length) {
+        $("#customer-data").innerHTML = '<p class="empty-state">No hay cuentas vinculadas todav\xEDa. Pide al almac\xE9n que te agregue como titular o integrante.</p>';
+        return;
+      }
+      $("#customer-data").innerHTML = visibleAccounts.map((a) => {
+        const mine = membershipsByAccount.get(a.id) || [], isHolder = mine.some((r) => r.rol_cuenta === "titular"), myIds = mine.map((r) => r.id), allowedIds = isHolder ? storeMembers.filter((m) => m.cuenta_id === a.id && m.estado === "activo").map((m) => m.id) : myIds;
+        const permitted = movements.filter((m) => m.cuenta_id === a.id && (isHolder || myIds.includes(m.integrante_id))), filtered = permitted.filter((m) => (!memberFilter || memberFilter === a.id + ":" + m.integrante_id) && inDateRange(m.creado_en, from, to));
+        const accountTotal = isHolder ? balance(a.id) : permitted.filter((m) => allowedIds.includes(m.integrante_id)).reduce((sum, m) => sum + (["fiado", "ajuste_cargo"].includes(m.tipo) ? Number(m.monto) : -Number(m.monto)), 0);
+        return '<article class="customer-account"><div class="customer-account-head"><div><span class="eyebrow">' + esc(a.tipo) + "</span><h3>" + esc(a.nombre) + '</h3></div><div class="balance"><span>' + (isHolder && a.tipo === "familiar" ? "Deuda familiar" : "Tu saldo") + "</span><strong>" + money(accountTotal) + '</strong></div></div><div class="movement-list">' + (filtered.length ? filtered.map((m) => {
+          const debit = ["fiado", "ajuste_cargo"].includes(m.tipo), member = storeMembers.find((x) => x.id === m.integrante_id);
+          return '<div class="movement-row"><span><strong>' + esc(m.tipo.replace("_", " ")) + (isHolder && member ? " \xB7 " + esc(member.nombre) : "") + "</strong><small>" + new Date(m.creado_en).toLocaleString("es-CL") + (m.descripcion ? " \xB7 " + esc(m.descripcion) : "") + '</small></span><strong class="' + (debit ? "debit" : "credit") + '">' + (debit ? "+" : "\u2212") + money(m.monto) + "</strong></div>";
+        }).join("") : '<p class="empty-state">No hay movimientos para estos filtros.</p>') + "</div></article>";
+      }).join("");
+    }
+    ["customer-history-account", "customer-history-member", "customer-history-from", "customer-history-to"].forEach((id) => $("#" + id).addEventListener("change", renderCustomerHistory));
+    renderCustomerHistory();
     $("#start-qr-scan").addEventListener("click", async () => {
       const button = $("#start-qr-scan");
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) {

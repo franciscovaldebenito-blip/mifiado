@@ -8,7 +8,7 @@ const publicDir = path.join(__dirname, 'public');
 app.disable('x-powered-by');
 app.use(express.json({ limit: '32kb' }));
 app.get('/health', (_req, res) => res.json({ status: 'ok', app: 'mifiado' }));
-app.get('/__mifiado_version', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ build: 'password-recovery-v1', root: __dirname }); });
+app.get('/__mifiado_version', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ build: 'family-tabs-v1', root: __dirname }); });
 
 // La URL y la clave publishable/anon son públicas por diseño. Nunca exponer service_role.
 app.get('/config.js', (_req, res) => {
