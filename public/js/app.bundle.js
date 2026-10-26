@@ -52252,6 +52252,7 @@ ${suffix}`;
   var pendingChargePoll = null;
   var customerScanner = null;
   var customerPendingHash = null;
+  var passwordRecoveryMode = new URLSearchParams(location.hash.slice(1)).get("type") === "recovery";
   function esc(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   }
@@ -52283,13 +52284,36 @@ ${suffix}`;
     $("#app-view").hidden = true;
     $("#panel-view").hidden = true;
     $("#signout-button").hidden = true;
+    $("#auth-form").hidden = false;
+    $("#recovery-request-form").hidden = true;
+    $("#password-recovery-form").hidden = true;
+    $("#forgot-password-button").hidden = false;
+    document.querySelector(".tabs").hidden = false;
+    document.querySelector(".small-note").hidden = false;
   }
   function setAuthMode(mode) {
     document.querySelectorAll("[data-auth-tab]").forEach((b) => b.classList.toggle("active", b.dataset.authTab === mode));
     $("#name-field").hidden = mode !== "signup";
     $("#auth-submit").textContent = mode === "signup" ? "Crear cuenta" : "Ingresar";
     $("#auth-form").dataset.mode = mode;
+    $("#forgot-password-button").hidden = mode !== "login";
     message("#auth-message", "");
+  }
+  function showRecoveryRequest() {
+    showAuth();
+    $("#auth-form").hidden = true;
+    $("#recovery-request-form").hidden = false;
+    $("#forgot-password-button").hidden = true;
+    document.querySelector(".tabs").hidden = true;
+    document.querySelector(".small-note").hidden = true;
+  }
+  function showPasswordRecovery() {
+    showAuth();
+    $("#auth-form").hidden = true;
+    $("#password-recovery-form").hidden = false;
+    $("#forgot-password-button").hidden = true;
+    document.querySelector(".tabs").hidden = true;
+    document.querySelector(".small-note").hidden = true;
   }
   document.addEventListener("click", (event) => {
     const tab = event.target.closest("[data-auth-tab]");
@@ -52299,6 +52323,61 @@ ${suffix}`;
     }
   });
   setAuthMode("login");
+  $("#forgot-password-button").addEventListener("click", () => {
+    const email = $('#auth-form [name="email"]').value.trim().toLowerCase();
+    showRecoveryRequest();
+    $('#recovery-request-form [name="email"]').value = email;
+  });
+  $("#recovery-back-button").addEventListener("click", () => {
+    showAuth();
+    setAuthMode("login");
+  });
+  $("#recovery-request-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!supabase) {
+      message("#recovery-request-message", "No se pudo conectar con Supabase.", true);
+      return;
+    }
+    const email = String(new FormData(e.currentTarget).get("email")).trim().toLowerCase(), btn = e.currentTarget.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    message("#recovery-request-message", "Enviando enlace\u2026");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+      if (error) throw error;
+      message("#recovery-request-message", "Si el correo est\xE1 registrado, recibir\xE1s un enlace para crear una nueva contrase\xF1a. Revisa tambi\xE9n spam.");
+    } catch (err) {
+      message("#recovery-request-message", explain(err), true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $("#password-recovery-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!supabase) {
+      message("#password-recovery-message", "No se pudo conectar con Supabase.", true);
+      return;
+    }
+    const f = new FormData(e.currentTarget), password = String(f.get("password")), confirm = String(f.get("confirmPassword")), btn = e.currentTarget.querySelector('button[type="submit"]');
+    if (password !== confirm) {
+      message("#password-recovery-message", "Las contrase\xF1as no coinciden.", true);
+      return;
+    }
+    btn.disabled = true;
+    message("#password-recovery-message", "Guardando contrase\xF1a\u2026");
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      passwordRecoveryMode = false;
+      await supabase.auth.signOut();
+      showAuth();
+      setAuthMode("login");
+      message("#auth-message", "Contrase\xF1a actualizada. Ya puedes ingresar.");
+    } catch (err) {
+      message("#password-recovery-message", explain(err), true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
   $("#auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!supabase) {
@@ -52686,12 +52765,25 @@ ${suffix}`;
     $("#connection-state").textContent = "Falta configurar Supabase";
     $("#connection-state").classList.add("warning");
   } else {
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        passwordRecoveryMode = true;
+        showPasswordRecovery();
+        return;
+      }
+      if (passwordRecoveryMode) {
+        showPasswordRecovery();
+        return;
+      }
       if (session && session.user) loadIdentity(session.user).catch((err) => notify(explain(err), true));
       else showAuth();
     });
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) notify(explain(error), true);
+      if (passwordRecoveryMode) {
+        showPasswordRecovery();
+        return;
+      }
       if (data.session && data.session.user) loadIdentity(data.session.user).catch((err) => notify(explain(err), true));
     });
   }
