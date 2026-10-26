@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mifiado-shell-v11';
-const APP_SHELL = ['/', '/index.html', '/css/styles.css?v=family-tabs-v2', '/js/app.bundle.js?v=family-tabs-v2', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png'];
+const CACHE_NAME = 'mifiado-shell-v12';
+const APP_SHELL = ['/', '/index.html', '/css/styles.css?v=family-tabs-v3', '/js/app.bundle.js?v=family-tabs-v3', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png'];
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
